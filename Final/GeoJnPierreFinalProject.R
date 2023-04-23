@@ -51,3 +51,9 @@ Raw_Data <- Raw_Data %>%
   mutate(InTransit_Lead_Time = ifelse(is.na(InTransit_Lead_Time), median(InTransit_Lead_Time, na.rm = TRUE), InTransit_Lead_Time),
          Manufacturing_Lead_Time = ifelse(is.na(Manufacturing_Lead_Time), median(Manufacturing_Lead_Time, na.rm = TRUE), Manufacturing_Lead_Time)) %>%
   ungroup()
+
+# Update `Ship Date`, `Receipt Date`, `Quarter`, and `Year` columns
+Raw_Data$`Ship Date` <- as.Date(Raw_Data$`PO Download Date`) + Raw_Data$Manufacturing_Lead_Time
+Raw_Data$`Receipt Date` <- Raw_Data$`Ship Date` + Raw_Data$InTransit_Lead_Time
+Raw_Data$Quarter <- quarter(Raw_Data$`Receipt Date`)
+Raw_Data$Year <- year(Raw_Data$`Receipt Date`)
