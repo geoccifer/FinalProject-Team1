@@ -2,38 +2,49 @@
 library(lubridate)
 library(readxl)
 library(dplyr)
+library(tidyr)
 # Read in the raw data
-raw_data <- read_excel("RawData.xlsx", sheet = "Raw-Data")
+Raw_Data <- read_excel("RawData.xlsx", sheet = "Raw-Data")
 
 # Read in the calendar data
-calendar <- read_excel("RawData.xlsx", sheet = "Calendar")
-
-# Remove duplicate rows based on `Receipt Date`
-raw_data <- raw_data %>% distinct(`Receipt Date`, .keep_all = TRUE)
-
-# Add Quarter and Year columns to the calendar sheet
-calendar <- calendar %>%
-  mutate(Quarter = quarter(Start_Date),
-         Year = year(Start_Date))
+calendar <- read_excel("RawData.xlsx", sheet = "Calendar")%>%
+  mutate(Quarter = as.integer(Quarter))
 
 # Add Quarter and Year columns to the raw_data sheet by matching the Receipt Date to the date ranges in the calendar
-raw_data <- raw_data %>%
+Raw_Data <- Raw_Data %>%
   mutate(Quarter = quarter(`Receipt Date`),
          Year = year(`Receipt Date`)) %>%
   left_join(calendar, by = c("Quarter", "Year"))
 
 # Remove unnecessary columns from the final output
-raw_data <- raw_data %>% select(-c("S.No", "Start_Date", "End_date"))
+Raw_Data <- Raw_Data %>% select(-c("S.No", "Start_Date", "End_date"))
 
 # Convert date columns to date format
-raw_data <- raw_data %>%
+Raw_Data <- Raw_Data %>%
   mutate(across(starts_with("Date"), as.Date))
 
-raw_data <- raw_data %>%
-  # Convert date columns to date format
-  mutate(across(starts_with("Date"), as.Date)) %>%
-  # Calculate In-transit Lead Time and Manufacturing Lead Time
-  mutate(InTransitLeadTime = as.numeric(`Ship Date` - `Receipt Date`) +
-           as.numeric(`Receipt Date` - InventoryInStockDate),
-         ManufacturingLeadTime = as.numeric(FinishedGoodsProductionDate - ProductionStartDate))
+# Calculate In-transit Lead Time and Manufacturing Lead Time
+Raw_Data <- Raw_Data %>%
+  mutate(InTransit_Lead_Time = as.numeric(difftime(`Receipt Date`, `Ship Date`, units = "days")),
+         Manufacturing_Lead_Time = as.numeric(difftime(`Ship Date`, `PO Download Date`, units = "days")))
 
+# Ship Date = Manufacturing_Lead_Time + `PO Download Date`
+
+# Receipt Date = `Ship Date` + InTransit_Lead_Time
+
+# Ship Date = Manufacturing_Lead_Time + `PO Download Date`
+Raw_Data$`Ship Date`[is.na(Raw_Data$`Ship Date`)] <- as.Date(Raw_Data$`PO Download Date`[is.na(Raw_Data$`Ship Date`)]) + 
+  Raw_Data$Manufacturing_Lead_Time[is.na(Raw_Data$`Ship Date`)]
+
+# Receipt Date = `Ship Date` + InTransit_Lead_Time
+Raw_Data$`Receipt Date`[is.na(Raw_Data$`Receipt Date`)] <- as.Date(Raw_Data$`Ship Date`[is.na(Raw_Data$`Receipt Date`)]) +
+  Raw_Data$InTransit_Lead_Time[is.na(Raw_Data$`Receipt Date`)]
+
+impute_median <- function(x) {
+  x[is.na(x)] <- median(x, na.rm = TRUE)
+  return(x)
+}
+
+# Impute missing values with median
+Raw_Data <- Raw_Data %>%
+  mutate(across(everything(), impute_median))
