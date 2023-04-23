@@ -47,4 +47,7 @@ impute_median <- function(x) {
 
 # Impute missing values with median
 Raw_Data <- Raw_Data %>%
-  mutate(across(everything(), impute_median))
+  group_by(`PO Download Date`) %>%
+  mutate(InTransit_Lead_Time = ifelse(is.na(InTransit_Lead_Time), median(InTransit_Lead_Time, na.rm = TRUE), InTransit_Lead_Time),
+         Manufacturing_Lead_Time = ifelse(is.na(Manufacturing_Lead_Time), median(Manufacturing_Lead_Time, na.rm = TRUE), Manufacturing_Lead_Time)) %>%
+  ungroup()
